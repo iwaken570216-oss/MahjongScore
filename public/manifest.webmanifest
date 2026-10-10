@@ -1,0 +1,26 @@
+{
+  "name": "雀録 — 麻雀スコア管理",
+  "short_name": "雀録",
+  "description": "4人麻雀のスコアと対局履歴を、この端末に。",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#101413",
+  "theme_color": "#101413",
+  "icons": [
+    {
+      "src": "./icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "id": "./"
+}
