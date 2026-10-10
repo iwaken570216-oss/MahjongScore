@@ -649,3 +649,17 @@ select {
 .form-grid > .secondary {
   grid-column: 1/-1;
 }
+
+.settings-fields {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.room-panel {
+  margin-bottom: 24px;
+}
+.room-panel input {
+  font-size: 12px;
+  margin-bottom: 10px;
+}
