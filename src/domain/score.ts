@@ -3,7 +3,9 @@ export type Rules = {
   returnPoints: number;
   uma: number[];
   tie: "split" | "seat";
-  chipPrice: number;
+  chipPoints?: number;
+  /** Legacy monetary rule; retained only for old records. */
+  chipPrice?: number;
 };
 export type Player = { id: string; name: string };
 export type Round = {
@@ -20,21 +22,24 @@ export const defaultRules: Rules = {
   returnPoints: 30000,
   uma: [20, 10, -10, -20],
   tie: "split",
-  chipPrice: 100,
+  chipPoints: 1,
 };
 export function validateRules(r: Rules): string | null {
   if (
-    ![r.startingPoints, r.returnPoints, r.chipPrice, ...r.uma].every(
-      Number.isFinite,
-    )
+    ![
+      r.startingPoints,
+      r.returnPoints,
+      r.chipPoints ?? r.chipPrice ?? 1,
+      ...r.uma,
+    ].every(Number.isFinite)
   )
     return "設定には有効な数値を入力してください。";
   if (
     r.startingPoints <= 0 ||
     r.returnPoints < r.startingPoints ||
-    r.chipPrice < 0
+    (r.chipPoints ?? r.chipPrice ?? 1) < 0
   )
-    return "持ち点は正数、返し点は持ち点以上、チップ単価は0以上にしてください。";
+    return "持ち点は正数、返し点は持ち点以上、チップポイントは0以上にしてください。";
   if (
     r.uma.length !== 4 ||
     Math.abs(r.uma.reduce((a, b) => a + b, 0)) > 0.000001
@@ -73,47 +78,76 @@ export function calculate(points: number[], chips: number[], rules: Rules) {
       rank,
       score:
         Math.round(((point - rules.returnPoints) / 1000 + bonus) * 1000) / 1000,
-      chipAmount: chips[i] * rules.chipPrice,
+      chipPoints:
+        rules.chipPoints !== undefined ? chips[i] * rules.chipPoints : 0,
+      chipAmount:
+        rules.chipPoints === undefined ? chips[i] * (rules.chipPrice ?? 0) : 0,
+      chipCount: chips[i],
       topShare: positions.includes(0) ? 1 / positions.length : 0,
     };
   });
 }
-export function totals(rounds: Round[]) {
-  const map = new Map<
-    string,
-    {
-      id: string;
-      name: string;
-      score: number;
-      chipAmount: number;
-      games: number;
-      top: number;
-    }
-  >();
+export function totals(rounds: Round[], roster: Player[] = []) {
+  type Row = Player & {
+    score: number;
+    chipPoints: number;
+    chipAmount: number;
+    chipCount: number;
+    games: number;
+    top: number;
+  };
+  const empty = (player: Player): Row => ({
+    ...player,
+    score: 0,
+    chipPoints: 0,
+    chipAmount: 0,
+    chipCount: 0,
+    games: 0,
+    top: 0,
+  });
+  const map = new Map<string, Row>(
+    roster.map((player) => [player.id, empty(player)]),
+  );
   rounds.forEach((round) =>
     calculate(round.points, round.chips, round.rules).forEach((result, i) => {
       const p = round.players[i];
-      const row = map.get(p.id) ?? {
-        ...p,
-        score: 0,
-        chipAmount: 0,
-        games: 0,
-        top: 0,
-      };
+      const row = map.get(p.id) ?? empty(p);
       row.score += result.score;
+      row.chipPoints += result.chipPoints;
       row.chipAmount += result.chipAmount;
+      row.chipCount += result.chipCount;
       row.games++;
       row.top += result.topShare;
       map.set(p.id, row);
     }),
   );
-  return [...map.values()]
-    .sort((a, b) => b.score - a.score)
-    .map((r, i, rows) => ({
-      ...r,
-      rank: rows.findIndex((x) => Math.abs(x.score - r.score) < 0.000001) + 1,
-      topRate: (r.top / r.games) * 100,
-    }));
+  const played = [...map.values()]
+    .filter((row) => row.games > 0)
+    .sort((a, b) => b.score - a.score);
+  const waiting = [...map.values()].filter((row) => row.games === 0);
+  return [...played, ...waiting].map((row) => ({
+    ...row,
+    rank: row.games
+      ? played.findIndex((x) => Math.abs(x.score - row.score) < 0.000001) + 1
+      : 0,
+    topRate: row.games ? (row.top / row.games) * 100 : 0,
+  }));
+}
+/** Use the latest four seats, filling any removed members from the roster. */
+export function participants(
+  roster: Player[],
+  previous: Player[] = [],
+): Player[] {
+  const ids = [...previous.map((p) => p.id), ...roster.map((p) => p.id)];
+  return [...new Set(ids)]
+    .map((id) => roster.find((p) => p.id === id))
+    .filter((p): p is Player => Boolean(p))
+    .slice(0, 4);
+}
+export function validateParticipants(players: Player[]): string | null {
+  return players.length === 4 && new Set(players.map((p) => p.id)).size === 4
+    ? null
+    : "重複しない4人の参加者を選んでください。";
 }
 export function localDate() {
   const d = new Date();

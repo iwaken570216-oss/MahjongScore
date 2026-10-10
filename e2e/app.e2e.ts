@@ -11,13 +11,13 @@ test("スマホで設定・点数入力・永続化・修正・CSV・削除・�
   ).toBeVisible();
   await page.getByRole("button", { name: "設定", exact: true }).click();
   for (const [seat, name] of [
-    ["東家", "Alice"],
-    ["南家", "Bob"],
-    ["西家", "Carol"],
-    ["北家", "Dave"],
+    ["プレイヤー1", "Alice"],
+    ["プレイヤー2", "Bob"],
+    ["プレイヤー3", "Carol"],
+    ["プレイヤー4", "Dave"],
   ])
     await page.getByLabel(seat, { exact: true }).fill(name);
-  await page.getByLabel("1枚あたりの単価（円）").fill("200");
+  await page.getByLabel("1枚あたりのポイント").fill("200");
   await page.getByRole("button", { name: "設定を保存" }).click();
   await expect(page.getByRole("status")).toContainText("保存しました");
   await page.getByRole("button", { name: "今日", exact: true }).click();
@@ -39,7 +39,7 @@ test("スマホで設定・点数入力・永続化・修正・CSV・削除・�
   await expect(dialog).not.toBeVisible();
   await expect(page.locator(".score-card").first()).toContainText("+70");
   await expect(page.locator(".score-card").first()).toContainText("100.0%");
-  await expect(page.locator(".score-card").first()).toContainText("+400円");
+  await expect(page.locator(".score-card").first()).toContainText("+400 pt");
   await page.reload();
   await expect(page.locator(".score-card").first()).toContainText("Alice");
   await expect(page.locator(".score-card").first()).toContainText("+70");
@@ -136,4 +136,95 @@ test("GitHub Pages配下でReact・manifest・アイコン・Service Workerを�
   expect(new URL(registration.scope).pathname).toBe("/MahjongScore/");
   expect(new URL(registration.script!).pathname).toBe("/MahjongScore/sw.js");
   expect(failed).toEqual([]);
+});
+
+test("6人登録・5人交代・休みの成績・チップポイントの別集計", async ({
+  page,
+}, testInfo) => {
+  await page.goto("./");
+  await page.getByRole("button", { name: "設定", exact: true }).click();
+  for (let i = 0; i < 4; i++)
+    await page
+      .getByLabel(`プレイヤー${i + 1}`, { exact: true })
+      .fill(["Alice", "Bob", "Carol", "Dave"][i]);
+  await page.getByRole("button", { name: "＋ プレイヤーを追加" }).click();
+  await page.getByLabel("プレイヤー5", { exact: true }).fill("Eve");
+  await page.getByRole("button", { name: "＋ プレイヤーを追加" }).click();
+  await page.getByLabel("プレイヤー6", { exact: true }).fill("Frank");
+  await page.getByLabel("1枚あたりのポイント").fill("2.5");
+  await page.getByRole("button", { name: "設定を保存" }).click();
+  await expect(page.getByRole("status")).toContainText("保存しました");
+  await page.getByRole("button", { name: "今日", exact: true }).click();
+  async function record(names: string[]) {
+    for (let i = 0; i < 4; i++) {
+      await page
+        .getByLabel(`${names[i]}の点数`)
+        .fill(["40000", "30000", "20000", "10000"][i]);
+      await page
+        .getByLabel(`${names[i]}のチップ枚数`)
+        .fill(["-100", "100", "0", "0"][i]);
+    }
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "結果を保存", exact: true })
+      .click();
+    await expect(page.getByRole("dialog")).not.toBeVisible();
+  }
+  await page.getByRole("button", { name: "＋ 半荘の結果を入力" }).click();
+  await expect(page.getByLabel("東家の参加者")).toHaveValue("player-0");
+  await record(["Alice", "Bob", "Carol", "Dave"]);
+  const alice = page
+    .locator(".score-card")
+    .filter({ has: page.getByRole("heading", { name: "Alice", exact: true }) });
+  await expect(alice).toContainText("+50");
+  await expect(alice).toContainText("-250 pt");
+  await expect(alice).toContainText("100.0%");
+  await page.getByRole("button", { name: "＋ 半荘の結果を入力" }).click();
+  await page.getByLabel("東家の参加者").selectOption({ label: "Eve" });
+  await expect(page.getByRole("dialog")).toContainText("休み: Alice、Frank");
+  await record(["Eve", "Bob", "Carol", "Dave"]);
+  await expect(alice).toContainText("· 1回");
+  await expect(alice).toContainText("100.0%");
+  await expect(
+    page
+      .locator(".score-card")
+      .filter({ has: page.getByRole("heading", { name: "Bob", exact: true }) }),
+  ).toContainText("· 2回");
+  await expect(
+    page
+      .locator(".score-card")
+      .filter({
+        has: page.getByRole("heading", { name: "Frank", exact: true }),
+      }),
+  ).toContainText("· 0回");
+  await page.reload();
+  await expect(alice).toContainText("+50");
+  await page.getByRole("button", { name: "＋ 半荘の結果を入力" }).click();
+  await expect(page.getByLabel("東家の参加者")).toHaveValue(
+    (await page
+      .getByLabel("東家の参加者")
+      .locator("option", { hasText: "Eve" })
+      .getAttribute("value")) ?? "",
+  );
+  await page.getByRole("button", { name: "キャンセル", exact: true }).click();
+  await page.getByRole("button", { name: "履歴", exact: true }).click();
+  await expect(page.locator(".history-card")).toHaveCount(2);
+  await expect(page.locator(".history-card").first()).toContainText("Eve");
+  await page
+    .locator(".history-card")
+    .last()
+    .getByRole("button", { name: "修正", exact: true })
+    .click();
+  await expect(page.getByLabel("Aliceの点数")).toHaveValue("40000");
+  await page.getByRole("button", { name: "キャンセル", exact: true }).click();
+  await page.getByRole("button", { name: "今日", exact: true }).click();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: `test-results/rotation-${testInfo.project.name}.png`,
+    fullPage: true,
+  });
 });
