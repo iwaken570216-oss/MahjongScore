@@ -632,3 +632,20 @@ select {
     gap: 6px;
   }
 }
+
+.history-chips {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 400;
+  margin-top: 5px;
+}
+.participant-picker {
+  border: 1px solid #d6b97635;
+  border-radius: 10px;
+  padding: 0 12px;
+  margin-top: 16px;
+}
+.form-grid > .secondary {
+  grid-column: 1/-1;
+}

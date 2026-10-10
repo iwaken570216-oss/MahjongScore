@@ -16,7 +16,7 @@ describe("半荘の計算", () => {
     expect(r.map((x) => x.score)).toEqual([50, 10, -20, -40]);
     expect(r.map((x) => x.rank)).toEqual([1, 2, 3, 4]);
     expect(r.reduce((s, x) => s + x.score, 0)).toBe(0);
-    expect(r.map((x) => x.chipAmount)).toEqual([200, -100, 0, -100]);
+    expect(r.map((x) => x.chipPoints)).toEqual([2, -1, 0, -1]);
   });
   it("箱下を計算できる", () => {
     const r = calculate(
@@ -76,7 +76,7 @@ describe("半荘の計算", () => {
     expect(
       validateRules({ ...defaultRules, uma: [20, 10, -10, -10] }),
     ).toBeTruthy();
-    expect(validateRules({ ...defaultRules, chipPrice: -1 })).toBeTruthy();
+    expect(validateRules({ ...defaultRules, chipPoints: -1 })).toBeTruthy();
     expect(() =>
       calculate([NaN, 0, 0, 0], [0, 0, 0, 0], defaultRules),
     ).toThrow();
@@ -105,7 +105,64 @@ it("累計順位とトップ率、保存時ルールを使って集計", () => {
     rank: 1,
     topRate: 75,
     games: 2,
-    chipAmount: 200,
+    chipPoints: 2,
   });
   expect(totals([round]).map((x) => x.rank)).toEqual([1, 1, 3, 4]);
+});
+
+it("チップポイントは別集計で順位を変えない", () => {
+  const result = calculate([40000, 30000, 20000, 10000], [-100, 100, 0, 0], {
+    ...defaultRules,
+    chipPoints: 2.5,
+  });
+  expect(result.map((r) => r.chipPoints)).toEqual([-250, 250, 0, 0]);
+  expect(result.map((r) => r.rank)).toEqual([1, 2, 3, 4]);
+  expect(result.map((r) => r.score)).toEqual([50, 10, -20, -40]);
+});
+it("5人交代でもID別に集計し休んだ半荘を分母に含めない", () => {
+  const roster = ["A", "B", "C", "D", "E", "F"].map((id) => ({ id, name: id }));
+  const first = {
+    ...round,
+    players: roster.slice(0, 4),
+    points: [40000, 30000, 20000, 10000],
+  };
+  const second = {
+    ...first,
+    id: "r2",
+    players: [roster[4], ...roster.slice(1, 4)],
+  };
+  const rows = totals([first, second], roster);
+  expect(rows.find((r) => r.id === "A")).toMatchObject({
+    games: 1,
+    score: 50,
+    topRate: 100,
+  });
+  expect(rows.find((r) => r.id === "E")).toMatchObject({
+    games: 1,
+    score: 50,
+    topRate: 100,
+  });
+  expect(rows.find((r) => r.id === "B")).toMatchObject({
+    games: 2,
+    score: 20,
+    topRate: 0,
+  });
+  expect(rows.find((r) => r.id === "F")).toMatchObject({
+    games: 0,
+    rank: 0,
+    topRate: 0,
+  });
+});
+it("旧金額記録をポイントへ誤変換しない", () => {
+  const { chipPoints: _, ...oldRules } = defaultRules;
+  const result = calculate([40000, 30000, 20000, 10000], [2, -1, 0, -1], {
+    ...oldRules,
+    chipPrice: 100,
+  });
+  expect(result[0]).toMatchObject({
+    chipPoints: 0,
+    chipAmount: 200,
+    chipCount: 2,
+    score: 50,
+  });
 });

@@ -4,6 +4,8 @@ import {
   localDate,
   totals,
   validateRules,
+  participants,
+  validateParticipants,
   type Round,
 } from "./domain/score";
 import { exportCsv } from "./domain/csv";
@@ -90,7 +92,7 @@ export default function App() {
     };
   }, [Boolean(editing), Boolean(deleteId), busy]);
   const today = rounds.filter((r) => r.date === localDate());
-  const summary = totals(today);
+  const summary = totals(today, settings.players);
   const players = editing?.players ?? settings.players,
     rules = editing?.rules ?? settings.rules;
   const validInput =
@@ -124,7 +126,10 @@ export default function App() {
       round ?? {
         id: "",
         date: localDate(),
-        players: settings.players,
+        players: participants(
+          settings.players,
+          [...rounds].sort((a, b) => b.createdAt - a.createdAt)[0]?.players,
+        ),
         points: [0, 0, 0, 0],
         chips: [0, 0, 0, 0],
         rules: settings.rules,
@@ -145,6 +150,11 @@ export default function App() {
   async function submit() {
     if (!editing || !validInput || !date) {
       setError("日付と4人分の整数を入力してください。");
+      return;
+    }
+    const participantError = validateParticipants(editing.players);
+    if (participantError) {
+      setError(participantError);
       return;
     }
     if (pointSum !== rules.startingPoints * 4) {
@@ -180,8 +190,12 @@ export default function App() {
       return;
     }
     const names = draft.players.map((p) => p.name.trim());
-    if (names.some((n) => !n) || new Set(names).size !== 4) {
-      setError("4人の名前を重複せずに登録してください。");
+    if (
+      names.length < 4 ||
+      names.some((n) => !n) ||
+      new Set(names).size !== names.length
+    ) {
+      setError("4人以上の名前を重複せずに登録してください。");
       return;
     }
     const updated = {
@@ -281,7 +295,7 @@ export default function App() {
                   <div>
                     <span>現在のトップ</span>
                     <strong className="leader">
-                      {summary[0]
+                      {summary[0]?.games
                         ? `${summary[0].name}${summary.filter((row) => row.rank === 1).length > 1 ? " ほか" + (summary.filter((row) => row.rank === 1).length - 1) + "人" : ""}`
                         : "—"}
                     </strong>
@@ -292,17 +306,7 @@ export default function App() {
                   <span className="eyebrow">DAILY SCORE</span>
                 </div>
                 <div className="score-list">
-                  {(summary.length
-                    ? summary
-                    : settings.players.map((p) => ({
-                        ...p,
-                        rank: 0,
-                        score: 0,
-                        chipAmount: 0,
-                        games: 0,
-                        topRate: 0,
-                      }))
-                  ).map((row) => (
+                  {summary.map((row) => (
                     <article
                       className={`score-card ${row.rank === 1 ? "first" : ""}`}
                       key={row.id}
@@ -322,7 +326,15 @@ export default function App() {
                         <strong className={row.score < 0 ? "negative" : ""}>
                           {signed(row.score)}
                         </strong>
-                        <small>チップ {signed(row.chipAmount)}円</small>
+                        <small>
+                          チップ {signed(row.chipPoints)} pt ·{" "}
+                          {signed(row.chipCount)}枚
+                        </small>
+                        {row.chipAmount !== 0 && (
+                          <small>
+                            旧記録 {signed(row.chipAmount)}円（別集計）
+                          </small>
+                        )}
                       </div>
                     </article>
                   ))}
@@ -410,7 +422,15 @@ export default function App() {
                       {calculate(r.points, r.chips, r.rules).map((s, i) => (
                         <div className="history-row" key={r.players[i].id}>
                           <span>{s.rank}位</span>
-                          <strong>{r.players[i].name}</strong>
+                          <strong>
+                            {r.players[i].name}
+                            <small className="history-chips">
+                              チップ{" "}
+                              {r.rules.chipPoints !== undefined
+                                ? `${signed(s.chipPoints)} pt`
+                                : `旧記録 ${signed(s.chipAmount)}円`}
+                            </small>
+                          </strong>
                           <span>{number(r.points[i])}点</span>
                           <b className={s.score < 0 ? "negative" : ""}>
                             {signed(s.score)}
@@ -445,27 +465,61 @@ export default function App() {
                   <h2>プレイヤー登録</h2>
                   <p className="hint">
                     同点を席順で決める場合、東 → 南 → 西 →
-                    北を優先します。名前の変更は同じプレイヤーの表示名変更です。
+                    北を優先します。5人以上も登録でき、半荘ごとに参加する4人を選べます。休みの人の成績はそのまま残ります。名前の変更は同じプレイヤーの表示名変更です。
                   </p>
                   <div className="form-grid">
                     {draft.players.map((p, i) => (
-                      <label key={p.id}>
-                        {seats[i]}家
-                        <input
-                          maxLength={20}
-                          value={p.name}
-                          onChange={(e) =>
+                      <div key={p.id}>
+                        <label>
+                          プレイヤー{i + 1}
+                          <input
+                            maxLength={20}
+                            value={p.name}
+                            onChange={(e) =>
+                              setDraft({
+                                ...draft,
+                                players: draft.players.map((v, j) =>
+                                  j === i ? { ...v, name: e.target.value } : v,
+                                ),
+                              })
+                            }
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          className="danger"
+                          disabled={draft.players.length <= 4}
+                          onClick={() =>
                             setDraft({
                               ...draft,
-                              players: draft.players.map((v, j) =>
-                                j === i ? { ...v, name: e.target.value } : v,
+                              players: draft.players.filter(
+                                (player) => player.id !== p.id,
                               ),
                             })
                           }
-                        />
-                      </label>
+                        >
+                          登録から外す
+                        </button>
+                      </div>
                     ))}
                   </div>
+                  <button
+                    className="secondary full"
+                    onClick={() =>
+                      setDraft({
+                        ...draft,
+                        players: [
+                          ...draft.players,
+                          { id: crypto.randomUUID(), name: "" },
+                        ],
+                      })
+                    }
+                  >
+                    ＋ プレイヤーを追加
+                  </button>
+                  <p className="hint">
+                    最低4人を登録してください。登録から外しても過去の対局は削除されません。別の人を登録するときは名前の上書きではなく追加してください。
+                  </p>
                 </section>
                 <section className="panel">
                   <h2>点数計算</h2>
@@ -552,24 +606,25 @@ export default function App() {
                 <section className="panel">
                   <h2>チップ</h2>
                   <label>
-                    1枚あたりの単価（円）
+                    1枚あたりのポイント
                     <input
                       type="number"
                       min="0"
-                      value={draft.rules.chipPrice}
+                      step="0.1"
+                      value={draft.rules.chipPoints}
                       onChange={(e) =>
                         setDraft({
                           ...draft,
                           rules: {
                             ...draft.rules,
-                            chipPrice: Number(e.target.value),
+                            chipPoints: Number(e.target.value),
                           },
                         })
                       }
                     />
                   </label>
                   <p className="hint">
-                    チップはスコアとは別に集計します。ルール変更は今後の対局に適用されます。
+                    チップはポイントで別集計します。順位は麻雀スコアのみで決定します。ルール変更は今後の対局に適用されます。
                   </p>
                 </section>
                 <button
@@ -655,6 +710,55 @@ export default function App() {
             <p className="hint">
               点数は素点、チップは増減を入力。箱下は「−」で入力できます。
             </p>
+            {!editing.id && (
+              <section className="participant-picker">
+                <h3>今回の参加者（4人）</h3>
+                <div className="form-grid">
+                  {players.map((p, i) => (
+                    <label key={i}>
+                      {seats[i]}家の参加者
+                      <select
+                        value={p.id}
+                        onChange={(e) => {
+                          const selected = settings.players.find(
+                            (player) => player.id === e.target.value,
+                          );
+                          if (selected)
+                            setEditing({
+                              ...editing,
+                              players: editing.players.map((player, j) =>
+                                j === i ? selected : player,
+                              ),
+                            });
+                        }}
+                      >
+                        {settings.players.map((player) => (
+                          <option
+                            key={player.id}
+                            value={player.id}
+                            disabled={players.some(
+                              (other, j) => j !== i && other.id === player.id,
+                            )}
+                          >
+                            {player.name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ))}
+                </div>
+                <p className="hint">
+                  休み:{" "}
+                  {settings.players
+                    .filter(
+                      (p) => !players.some((player) => player.id === p.id),
+                    )
+                    .map((p) => p.name)
+                    .join("、") || "なし"}
+                  。同点の席順優先はこの席順で判定します。
+                </p>
+              </section>
+            )}
             <div className="entry-heading">
               <span>プレイヤー</span>
               <span>終了点数</span>

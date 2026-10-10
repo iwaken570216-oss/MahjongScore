@@ -13,11 +13,21 @@ const database = () =>
     },
   });
 export type Settings = { players: Player[]; rules: Rules };
+/** Upgrade editable settings without rewriting historical monetary records. */
+export function normalizeSettings(settings: Settings): Settings {
+  const { chipPrice: _legacy, ...rules } = settings.rules;
+  return {
+    ...settings,
+    rules: { ...rules, chipPoints: rules.chipPoints ?? 1 },
+  };
+}
 export async function load() {
   const db = await database();
+  const settings = (await db.get("settings", "current")) as
+    Settings | undefined;
   return {
     rounds: (await db.getAll("rounds")) as Round[],
-    settings: (await db.get("settings", "current")) as Settings | undefined,
+    settings: settings ? normalizeSettings(settings) : undefined,
   };
 }
 export async function saveRound(round: Round) {
