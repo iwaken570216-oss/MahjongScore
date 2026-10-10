@@ -124,6 +124,7 @@ export default function App() {
   async function perform(action: () => Promise<void>, message: string) {
     setBusy(true);
     setError("");
+    setNotice("");
     try {
       await action();
       setNotice(message);
@@ -322,7 +323,11 @@ export default function App() {
         />
         {!ready || (shared.selected && !shared.room) ? (
           <div className="empty">
-            {shared.selected ? "共有ルームに接続しています。接続できない場合は上の案内をご確認ください。" : error ? "保存領域を利用できません。" : "記録を読み込んでいます…"}
+            {shared.selected
+              ? "共有ルームに接続しています。接続できない場合は上の案内をご確認ください。"
+              : error
+                ? "保存領域を利用できません。"
+                : "記録を読み込んでいます…"}
           </div>
         ) : (
           <>
@@ -416,7 +421,7 @@ export default function App() {
                   <button
                     onClick={() => {
                       setDraft(settings);
-                      setDraftRevision(shared.room?.revision??0);
+                      setDraftRevision(shared.room?.revision ?? 0);
                       setTab("settings");
                       setError("");
                     }}

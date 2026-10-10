@@ -143,7 +143,7 @@ export default function RoomPanel({
             </button>
             <button
               className="secondary"
-              disabled={locked}
+              disabled={disabled}
               onClick={() => {
                 setConfirm(false);
                 setCopied(false);

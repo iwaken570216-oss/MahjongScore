@@ -59,7 +59,7 @@ export function useRoom(ready: boolean) {
       const fresh = await readRoom(selection);
       if (current !== generation.current) return;
       setRoom((old) =>
-        old?.id === fresh.id && old.revision === fresh.revision ? old : fresh,
+        old?.id === fresh.id && old.revision >= fresh.revision ? old : fresh,
       );
       setConnected(true);
       setError("");
@@ -81,13 +81,17 @@ export function useRoom(ready: boolean) {
     roomRef.current = null;
     setConnected(false);
     setError("");
-    if (!selection) return;
+    if (!selection) {
+      setLoading(false);
+      return;
+    }
     if (!syncConfigured) {
       setError(
         "招待されたルームを開くには、アプリのSupabase接続設定が必要です。",
       );
       return;
     }
+    persist(selection);
     setLoading(true);
     void refresh();
     const timer = setInterval(() => {
@@ -136,7 +140,12 @@ export function useRoom(ready: boolean) {
   async function commit(snapshot: Snapshot, revision: number) {
     const current = roomRef.current;
     if (!current?.owner) throw new Error("代表者だけが変更できます。");
+    const requestGeneration = generation.current;
     const fresh = await updateRoom(current, snapshot, revision);
+    if (requestGeneration !== generation.current)
+      throw new Error(
+        "保存先のルームが切り替わりました。元のルームで保存結果をご確認ください。",
+      );
     setRoom(fresh);
     roomRef.current = fresh;
     setConnected(true);
@@ -147,7 +156,9 @@ export function useRoom(ready: boolean) {
     if (!current?.owner) return;
     setLoading(true);
     try {
+      const requestGeneration = generation.current;
       const fresh = await rotateInvite(current);
+      if (requestGeneration !== generation.current) return;
       setRoom(fresh);
       roomRef.current = fresh;
       setError("");
@@ -162,6 +173,7 @@ export function useRoom(ready: boolean) {
     persist(null);
     history.replaceState(null, "", location.pathname + location.search);
     setSelection(null);
+    setLoading(false);
     setRoom(null);
     roomRef.current = null;
     setError("");
