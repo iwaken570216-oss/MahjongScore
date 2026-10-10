@@ -121,14 +121,20 @@ export function totals(rounds: Round[], roster: Player[] = []) {
       map.set(p.id, row);
     }),
   );
-  const played = [...map.values()]
+  const rows = [...map.values()].map((row) => ({
+    ...row,
+    totalScore: Math.round((row.score + row.chipPoints) * 1000) / 1000,
+  }));
+  const played = rows
     .filter((row) => row.games > 0)
-    .sort((a, b) => b.score - a.score);
-  const waiting = [...map.values()].filter((row) => row.games === 0);
+    .sort((a, b) => b.totalScore - a.totalScore);
+  const waiting = rows.filter((row) => row.games === 0);
   return [...played, ...waiting].map((row) => ({
     ...row,
     rank: row.games
-      ? played.findIndex((x) => Math.abs(x.score - row.score) < 0.000001) + 1
+      ? played.findIndex(
+          (x) => Math.abs(x.totalScore - row.totalScore) < 0.000001,
+        ) + 1
       : 0,
     topRate: row.games ? (row.top / row.games) * 100 : 0,
   }));

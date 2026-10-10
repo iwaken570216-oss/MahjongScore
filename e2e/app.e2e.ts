@@ -37,12 +37,16 @@ test("スマホで設定・点数入力・永続化・修正・CSV・削除・�
   }
   await dialog.getByRole("button", { name: "結果を保存", exact: true }).click();
   await expect(dialog).not.toBeVisible();
-  await expect(page.locator(".score-card").first()).toContainText("+70");
+  await expect(
+    page.locator(".score-card").first().locator(".score > strong"),
+  ).toHaveText("+470");
   await expect(page.locator(".score-card").first()).toContainText("100.0%");
   await expect(page.locator(".score-card").first()).toContainText("+400 pt");
   await page.reload();
   await expect(page.locator(".score-card").first()).toContainText("Alice");
-  await expect(page.locator(".score-card").first()).toContainText("+70");
+  await expect(
+    page.locator(".score-card").first().locator(".score > strong"),
+  ).toHaveText("+470");
   await page.getByRole("button", { name: "履歴", exact: true }).click();
   await page.getByRole("button", { name: "修正", exact: true }).click();
   await page.getByLabel("Aliceの点数").fill("50000");
@@ -138,7 +142,7 @@ test("GitHub Pages配下でReact・manifest・アイコン・Service Workerを�
   expect(failed).toEqual([]);
 });
 
-test("6人登録・5人交代・休みの成績・チップポイントの別集計", async ({
+test("6人登録・5人交代・休みの成績・チップポイント込みの累計順位", async ({
   page,
 }, testInfo) => {
   await page.goto("./");
@@ -176,8 +180,12 @@ test("6人登録・5人交代・休みの成績・チップポイントの別集
   const alice = page
     .locator(".score-card")
     .filter({ has: page.getByRole("heading", { name: "Alice", exact: true }) });
-  await expect(alice).toContainText("+50");
+  await expect(alice.locator(".score > strong")).toHaveText("-200");
   await expect(alice).toContainText("-250 pt");
+  await expect(page.locator(".score-card").first()).toContainText("Bob");
+  await expect(
+    page.locator(".score-card").first().locator(".score > strong"),
+  ).toHaveText("+260");
   await expect(alice).toContainText("100.0%");
   await page.getByRole("button", { name: "＋ 半荘の結果を入力" }).click();
   await page.getByLabel("東家の参加者").selectOption({ label: "Eve" });
@@ -191,14 +199,12 @@ test("6人登録・5人交代・休みの成績・チップポイントの別集
       .filter({ has: page.getByRole("heading", { name: "Bob", exact: true }) }),
   ).toContainText("· 2回");
   await expect(
-    page
-      .locator(".score-card")
-      .filter({
-        has: page.getByRole("heading", { name: "Frank", exact: true }),
-      }),
+    page.locator(".score-card").filter({
+      has: page.getByRole("heading", { name: "Frank", exact: true }),
+    }),
   ).toContainText("· 0回");
   await page.reload();
-  await expect(alice).toContainText("+50");
+  await expect(alice.locator(".score > strong")).toHaveText("-200");
   await page.getByRole("button", { name: "＋ 半荘の結果を入力" }).click();
   await expect(page.getByLabel("東家の参加者")).toHaveValue(
     (await page
