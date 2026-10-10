@@ -107,10 +107,10 @@ it("累計順位とトップ率、保存時ルールを使って集計", () => {
     games: 2,
     chipPoints: 2,
   });
-  expect(totals([round]).map((x) => x.rank)).toEqual([1, 1, 3, 4]);
+  expect(totals([round]).map((x) => x.rank)).toEqual([1, 2, 3, 4]);
 });
 
-it("チップポイントは別集計で順位を変えない", () => {
+it("チップは半荘順位・素点スコアを変えない", () => {
   const result = calculate([40000, 30000, 20000, 10000], [-100, 100, 0, 0], {
     ...defaultRules,
     chipPoints: 2.5,
@@ -164,5 +164,67 @@ it("旧金額記録をポイントへ誤変換しない", () => {
     chipAmount: 200,
     chipCount: 2,
     score: 50,
+  });
+});
+
+it("本日の順位はチップ込み合計で逆転し、トップ率は素点のまま", () => {
+  const rows = totals([
+    {
+      ...round,
+      points: [40000, 30000, 20000, 10000],
+      chips: [-100, 100, 0, 0],
+      rules: { ...defaultRules, chipPoints: 2.5 },
+    },
+  ]);
+  expect(rows[0]).toMatchObject({
+    id: "B",
+    score: 10,
+    chipPoints: 250,
+    totalScore: 260,
+    rank: 1,
+    topRate: 0,
+  });
+  expect(rows.find((r) => r.id === "A")).toMatchObject({
+    score: 50,
+    chipPoints: -250,
+    totalScore: -200,
+    rank: 4,
+    topRate: 100,
+  });
+});
+it("チップ込み合計が同じなら同順位、未参加者は順位なし", () => {
+  const rows = totals(
+    [
+      {
+        ...round,
+        points: [40000, 30000, 20000, 10000],
+        chips: [-20, 20, 0, 0],
+      },
+    ],
+    [...round.players, { id: "E", name: "E" }],
+  );
+  expect(rows.slice(0, 2).map((r) => r.rank)).toEqual([1, 1]);
+  expect(rows.slice(0, 2).map((r) => r.totalScore)).toEqual([30, 30]);
+  expect(rows.find((r) => r.id === "E")).toMatchObject({
+    games: 0,
+    rank: 0,
+    totalScore: 0,
+  });
+});
+it("旧金額は合計スコアに加算しない", () => {
+  const { chipPoints: _, ...rules } = defaultRules;
+  const rows = totals([
+    {
+      ...round,
+      points: [40000, 30000, 20000, 10000],
+      chips: [-100, 100, 0, 0],
+      rules: { ...rules, chipPrice: 100 },
+    },
+  ]);
+  expect(rows[0]).toMatchObject({
+    id: "A",
+    score: 50,
+    totalScore: 50,
+    chipAmount: -10000,
   });
 });
