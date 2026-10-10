@@ -302,7 +302,7 @@ export default function App() {
                   </div>
                 </div>
                 <div className="section-heading">
-                  <h2>本日の成績</h2>
+                  <h2>本日の成績（チップ込み）</h2>
                   <span className="eyebrow">DAILY SCORE</span>
                 </div>
                 <div className="score-list">
@@ -323,9 +323,12 @@ export default function App() {
                         </p>
                       </div>
                       <div className="score">
-                        <strong className={row.score < 0 ? "negative" : ""}>
-                          {signed(row.score)}
+                        <strong
+                          className={row.totalScore < 0 ? "negative" : ""}
+                        >
+                          {signed(row.totalScore)}
                         </strong>
+                        <small>麻雀 {signed(row.score)} pt</small>
                         <small>
                           チップ {signed(row.chipPoints)} pt ·{" "}
                           {signed(row.chipCount)}枚
@@ -624,7 +627,7 @@ export default function App() {
                     />
                   </label>
                   <p className="hint">
-                    チップはポイントで別集計します。順位は麻雀スコアのみで決定します。ルール変更は今後の対局に適用されます。
+                    本日の成績は麻雀スコアとチップポイントを合算し、その合計で順位を決定します。半荘順位・トップ率は素点で判定します。ルール変更は今後の対局に適用されます。
                   </p>
                 </section>
                 <button
