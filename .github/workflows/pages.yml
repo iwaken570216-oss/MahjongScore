@@ -26,6 +26,9 @@ jobs:
       - name: Run unit and storage tests
         run: npm test
       - name: Build application
+        env:
+          VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
         run: npm run build
       - name: Install test browser
         run: npx playwright install --with-deps chromium

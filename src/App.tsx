@@ -1,3 +1,5 @@
+import { useRoom } from "./sync/useRoom";
+import RoomPanel from "./sync/RoomPanel";
 import { useEffect, useState } from "react";
 import {
   calculate,
@@ -22,9 +24,9 @@ const number = (v: number) =>
 const signed = (v: number) => `${v > 0 ? "+" : ""}${number(v)}`;
 const seats = ["東", "南", "西", "北"];
 export default function App() {
-  const [settings, setSettings] = useState<Settings>(initialSettings),
+  const [localSettings, setSettings] = useState<Settings>(initialSettings),
     [draft, setDraft] = useState<Settings>(initialSettings);
-  const [rounds, setRounds] = useState<Round[]>([]),
+  const [localRounds, setRounds] = useState<Round[]>([]),
     [tab, setTab] = useState<"today" | "history" | "settings">("today");
   const [ready, setReady] = useState(false),
     [error, setError] = useState(""),
@@ -36,6 +38,18 @@ export default function App() {
   const [date, setDate] = useState(localDate()),
     [filter, setFilter] = useState(""),
     [deleteId, setDeleteId] = useState<string | null>(null);
+  const shared = useRoom(ready);
+  const settings = shared.room?.data.settings ?? localSettings;
+  const rounds = shared.room?.data.rounds ?? localRounds;
+  const [editRevision, setEditRevision] = useState(0),
+    [draftRevision, setDraftRevision] = useState(0),
+    [deleteRevision, setDeleteRevision] = useState(0);
+  useEffect(() => {
+    setDraft(settings);
+    setDraftRevision(shared.room?.revision ?? 0);
+    setEditing(null);
+    setDeleteId(null);
+  }, [shared.room?.id, shared.selected]);
   useEffect(() => {
     load()
       .then((data) => {
@@ -113,15 +127,19 @@ export default function App() {
     try {
       await action();
       setNotice(message);
-    } catch {
+    } catch (caught) {
       setError(
-        "保存に失敗しました。保存容量やブラウザの設定を確認して、もう一度お試しください。",
+        shared.selected && caught instanceof Error
+          ? caught.message
+          : "保存に失敗しました。保存容量やブラウザの設定を確認して、もう一度お試しください。",
       );
     } finally {
       setBusy(false);
     }
   }
   function open(round?: Round) {
+    if (shared.readOnly) return;
+    setEditRevision(shared.room?.revision ?? 0);
     setEditing(
       round ?? {
         id: "",
@@ -148,6 +166,7 @@ export default function App() {
     }
   }
   async function submit() {
+    if (shared.readOnly) return;
     if (!editing || !validInput || !date) {
       setError("日付と4人分の整数を入力してください。");
       return;
@@ -178,12 +197,24 @@ export default function App() {
       createdAt: editing.createdAt || Date.now(),
     };
     await perform(async () => {
-      await saveRound(r);
-      setRounds((current) => [...current.filter((x) => x.id !== r.id), r]);
+      if (shared.selected) {
+        await shared.commit(
+          {
+            version: 1,
+            settings,
+            rounds: [...rounds.filter((x) => x.id !== r.id), r],
+          },
+          editRevision,
+        );
+      } else {
+        await saveRound(r);
+        setRounds((current) => [...current.filter((x) => x.id !== r.id), r]);
+      }
       setEditing(null);
     }, "対局結果を保存しました。");
   }
   async function storeSettings() {
+    if (shared.readOnly) return;
     const message = validateRules(draft.rules);
     if (message) {
       setError(message);
@@ -203,8 +234,16 @@ export default function App() {
       players: draft.players.map((p, i) => ({ ...p, name: names[i] })),
     };
     await perform(async () => {
-      await saveSettings(updated);
-      setSettings(updated);
+      if (shared.selected) {
+        await shared.commit(
+          { version: 1, settings: updated, rounds },
+          draftRevision,
+        );
+        setDraftRevision(draftRevision + 1);
+      } else {
+        await saveSettings(updated);
+        setSettings(updated);
+      }
       setDraft(updated);
     }, "プレイヤーとルールを保存しました。");
   }
@@ -237,7 +276,7 @@ export default function App() {
         </a>
         <span className="local-tag">
           <i />
-          端末に保存
+          {shared.selected ? "共有ルーム" : "端末に保存"}
         </span>
       </header>
       <main>
@@ -276,9 +315,14 @@ export default function App() {
             </button>
           </div>
         )}
-        {!ready ? (
+        <RoomPanel
+          shared={shared}
+          snapshot={{ version: 1, settings, rounds }}
+          disabled={busy || !ready}
+        />
+        {!ready || (shared.selected && !shared.room) ? (
           <div className="empty">
-            {error ? "保存領域を利用できません。" : "記録を読み込んでいます…"}
+            {shared.selected ? "共有ルームに接続しています。接続できない場合は上の案内をご確認ください。" : error ? "保存領域を利用できません。" : "記録を読み込んでいます…"}
           </div>
         ) : (
           <>
@@ -346,6 +390,7 @@ export default function App() {
                 )}
                 <button
                   className="primary full add-round"
+                  disabled={shared.readOnly || busy}
                   onClick={() => open()}
                 >
                   ＋ 半荘の結果を入力
@@ -368,6 +413,7 @@ export default function App() {
                   <button
                     onClick={() => {
                       setDraft(settings);
+                      setDraftRevision(shared.room?.revision??0);
                       setTab("settings");
                       setError("");
                     }}
@@ -438,12 +484,20 @@ export default function App() {
                         </div>
                       ))}
                       <div className="history-actions">
-                        <button className="secondary" onClick={() => open(r)}>
+                        <button
+                          disabled={shared.readOnly || busy}
+                          className="secondary"
+                          onClick={() => open(r)}
+                        >
                           修正
                         </button>
                         <button
                           className="danger"
-                          onClick={() => setDeleteId(r.id)}
+                          disabled={shared.readOnly || busy}
+                          onClick={() => {
+                            setDeleteRevision(shared.room?.revision ?? 0);
+                            setDeleteId(r.id);
+                          }}
                         >
                           削除
                         </button>
@@ -460,7 +514,10 @@ export default function App() {
               </>
             )}
             {tab === "settings" && (
-              <>
+              <fieldset
+                className="settings-fields"
+                disabled={shared.readOnly || busy}
+              >
                 <section className="panel">
                   <h2>プレイヤー登録</h2>
                   <p className="hint">
@@ -637,7 +694,7 @@ export default function App() {
                 <div className="privacy">
                   <h3>あなたの記録は、この端末に。</h3>
                   <p>
-                    データはブラウザ内のIndexedDBに保存されます。ブラウザのデータ削除で失われるため、定期的にCSVを出力してください。端末間の同期・CSV復元は未対応です。
+                    データはブラウザ内のIndexedDBに保存されます。ブラウザのデータ削除で失われるため、定期的にCSVを出力してください。共有ルームでは招待した人と成績を共有できます。CSV復元は未対応です。
                   </p>
                   <p>
                     iPhoneはSafariの共有メニュー
@@ -645,7 +702,7 @@ export default function App() {
                     →「アプリをインストール」で追加できます。
                   </p>
                 </div>
-              </>
+              </fieldset>
             )}
           </>
         )}
@@ -666,7 +723,10 @@ export default function App() {
               setTab(key);
               setError("");
               setNotice("");
-              if (key === "settings") setDraft(settings);
+              if (key === "settings") {
+                setDraft(settings);
+                setDraftRevision(shared.room?.revision ?? 0);
+              }
             }}
           >
             <span aria-hidden="true">{icon}</span>
@@ -853,10 +913,21 @@ export default function App() {
               disabled={busy}
               onClick={() =>
                 perform(async () => {
-                  await removeRound(deleteId);
-                  setRounds((current) =>
-                    current.filter((r) => r.id !== deleteId),
-                  );
+                  if (shared.selected) {
+                    await shared.commit(
+                      {
+                        version: 1,
+                        settings,
+                        rounds: rounds.filter((r) => r.id !== deleteId),
+                      },
+                      deleteRevision,
+                    );
+                  } else {
+                    await removeRound(deleteId);
+                    setRounds((current) =>
+                      current.filter((r) => r.id !== deleteId),
+                    );
+                  }
                   setDeleteId(null);
                 }, "対局を削除しました。")
               }

@@ -12,11 +12,14 @@
     "format": "prettier --write src e2e public/sw.js *.ts *.json index.html README.md"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.117.3",
     "idb": "^8.0.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "zod": "^4.6.5"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@playwright/test": "^1.64.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
