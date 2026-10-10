@@ -132,6 +132,10 @@ test("代表者と招待客の別ブラウザで共有・閲覧制限・競合�
     .click();
   await expect(page.getByLabel("閲覧用の招待リンク")).toBeVisible();
   const link = await page.getByLabel("閲覧用の招待リンク").inputValue();
+  const lineLink = await page
+    .getByRole("link", { name: "招待リンクをLINEで共有" })
+    .getAttribute("href");
+  expect(decodeURIComponent(lineLink!.split("?")[1])).toContain(link);
   expect(link).toContain(`#room=${id}`);
   const guest = await browser.newContext({
     viewport: { width: 390, height: 844 },

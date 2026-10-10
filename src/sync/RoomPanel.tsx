@@ -1,3 +1,4 @@
+import { lineShareUrl } from "../domain/share";
 import { useState } from "react";
 import { inviteUrl } from "./client";
 import type { useRoom } from "./useRoom";
@@ -112,6 +113,16 @@ export default function RoomPanel({
               >
                 {copied ? "コピーしました" : "招待リンクをコピー"}
               </button>
+              <a
+                className="secondary full share-link"
+                target="_blank"
+                rel="noopener noreferrer"
+                href={lineShareUrl(
+                  `雀録の成績を共有します（閲覧専用）\n${inviteUrl(shared.room)}`,
+                )}
+              >
+                招待リンクをLINEで共有
+              </a>
               <button
                 className="text-button full"
                 disabled={locked}

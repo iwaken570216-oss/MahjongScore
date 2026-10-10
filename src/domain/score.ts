@@ -95,6 +95,7 @@ export function totals(rounds: Round[], roster: Player[] = []) {
     chipCount: number;
     games: number;
     top: number;
+    rankSum: number;
   };
   const empty = (player: Player): Row => ({
     ...player,
@@ -104,6 +105,7 @@ export function totals(rounds: Round[], roster: Player[] = []) {
     chipCount: 0,
     games: 0,
     top: 0,
+    rankSum: 0,
   });
   const map = new Map<string, Row>(
     roster.map((player) => [player.id, empty(player)]),
@@ -118,6 +120,7 @@ export function totals(rounds: Round[], roster: Player[] = []) {
       row.chipCount += result.chipCount;
       row.games++;
       row.top += result.topShare;
+      row.rankSum += result.rank;
       map.set(p.id, row);
     }),
   );
@@ -136,6 +139,7 @@ export function totals(rounds: Round[], roster: Player[] = []) {
           (x) => Math.abs(x.totalScore - row.totalScore) < 0.000001,
         ) + 1
       : 0,
+    averageRank: row.games ? row.rankSum / row.games : null,
     topRate: row.games ? (row.top / row.games) * 100 : 0,
   }));
 }
