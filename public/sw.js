@@ -2,7 +2,7 @@
 const ROOT = new URL("./", self.location).href;
 // Isolate this project's cache from other Pages apps on the same origin.
 const CACHE_PREFIX = `janroku-${new URL(ROOT).pathname}-`;
-const CACHE = `${CACHE_PREFIX}v3`;
+const CACHE = `${CACHE_PREFIX}v5`;
 self.addEventListener("install", (event) => {
   event.waitUntil(
     (async () => {
@@ -16,7 +16,11 @@ self.addEventListener("install", (event) => {
         .filter((url) => url.origin === self.location.origin && !url.hash)
         .map((url) => url.href);
       await cache.addAll([
-        ...new Set([...assets, new URL("icon-512.png", ROOT).href]),
+        ...new Set([
+          ...assets,
+          new URL("icon-isou-192.png", ROOT).href,
+          new URL("icon-isou-512.png", ROOT).href,
+        ]),
       ]);
       await cache.put(ROOT, response);
     })(),

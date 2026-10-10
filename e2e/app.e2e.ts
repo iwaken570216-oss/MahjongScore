@@ -125,7 +125,7 @@ test("GitHub Pages配下でReact・manifest・アイコン・Service Workerを�
   const appleIcon = await page
     .locator('link[rel="apple-touch-icon"]')
     .evaluate((element) => (element as HTMLLinkElement).href);
-  expect(new URL(appleIcon).pathname).toBe("/MahjongScore/icon-192.png");
+  expect(new URL(appleIcon).pathname).toBe("/MahjongScore/icon-isou-180.png");
   const registration = await page.evaluate(async () => {
     const registration = await navigator.serviceWorker.ready;
     return {
