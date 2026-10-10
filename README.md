@@ -78,6 +78,16 @@ npm run test:e2e
 
 GitHubリポジトリの設定でActionsが無効化されている場合は有効化してください。組織の制限がある場合は管理者による許可が必要になることがあります。
 
+### configure-pagesで「HttpError: Not Found」が出た場合
+
+このワークフローはViteの固定baseでビルドした成果物を `actions/deploy-pages@v4` で直接公開します。Pagesのメタデータによるビルド設定が不要なので、`actions/configure-pages` は使用しません。
+
+Pagesは **Settings → Pages → Source: GitHub Actions** で事前に有効化してください。`configure-pages` の `enablement: true` は通常の `GITHUB_TOKEN` ではPagesを新規有効化できず、別の権限付きトークンが必要になるため、この構成では使用しません。deployジョブには `contents: read`、`pages: write`、`id-token: write` を明示しています。追加のシークレットは不要です。
+
+修正PRをmainにマージすると、新しいワークフローが自動実行されます。古い失敗実行の「Re-run jobs」は古いコミットのワークフローを再実行するため、修正確認には使わないでください。必要なら **Actions → Test and deploy GitHub Pages → Run workflow → main** から新しい実行を開始します。
+
+直接デプロイでも404が出る場合は、PagesのSourceがGitHub Actionsであることと、対象リポジトリでPagesが有効になっていることを再確認してください。403が出る場合はActionsのログのGITHUB_TOKEN権限と、組織・リポジトリのActions制限を確認してください。`github-pages` Environmentに承認待ちが表示された場合は、その承認を完了します。
+
 ### 保存データについて
 
 IndexedDBのDB名・保存形式・読み書きの実装は維持しています。公開後も同じ端末・ブラウザ・公開URLでの再読み込みやアプリ更新後に記録を利用できます。ただし保存領域はオリジン（ドメイン・プロトコル・ポート）ごとに分かれるため、localhostやクラウドプレビューに保存したデータはGitHub Pagesに自動移行されません。公開前に必要な記録をCSVで出力してください（CSVからの復元は未対応です）。
