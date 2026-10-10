@@ -33,8 +33,8 @@ export default function App() {
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState<Round | null>(null),
-    [points, setPoints] = useState<string[]>(["0", "0", "0", "0"]),
-    [chips, setChips] = useState<string[]>(["0", "0", "0", "0"]);
+    [points, setPoints] = useState<string[]>(["", "", "", ""]),
+    [chips, setChips] = useState<string[]>(["", "", "", ""]);
   const [date, setDate] = useState(localDate()),
     [filter, setFilter] = useState(""),
     [deleteId, setDeleteId] = useState<string | null>(null);
@@ -156,8 +156,8 @@ export default function App() {
       },
     );
     setDate(round?.date ?? localDate());
-    setPoints((round?.points ?? [0, 0, 0, 0]).map(String));
-    setChips((round?.chips ?? [0, 0, 0, 0]).map(String));
+    setPoints(round ? round.points.map(String) : ["", "", "", ""]);
+    setChips(round ? round.chips.map(String) : ["", "", "", ""]);
     setError("");
   }
   function close() {
@@ -169,7 +169,9 @@ export default function App() {
   async function submit() {
     if (shared.readOnly) return;
     if (!editing || !validInput || !date) {
-      setError("日付と4人分の整数を入力してください。");
+      setError(
+        "日付と4人分の終了点数・チップ枚数を入力してください。変動なしは0を入力してください。",
+      );
       return;
     }
     const participantError = validateParticipants(editing.players);

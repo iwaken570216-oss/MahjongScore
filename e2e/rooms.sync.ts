@@ -115,8 +115,10 @@ test("代表者と招待客の別ブラウザで共有・閲覧制限・競合�
     ["南家", "30000"],
     ["西家", "20000"],
     ["北家", "10000"],
-  ])
+  ]) {
     await page.getByLabel(`${name}の点数`).fill(value);
+    await page.getByLabel(`${name}のチップ枚数`).fill("0");
+  }
   await page
     .getByRole("dialog")
     .getByRole("button", { name: "結果を保存", exact: true })

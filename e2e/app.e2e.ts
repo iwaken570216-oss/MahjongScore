@@ -23,9 +23,10 @@ test("スマホで設定・点数入力・永続化・修正・CSV・削除・�
   await page.getByRole("button", { name: "今日", exact: true }).click();
   await page.getByRole("button", { name: "＋ 半荘の結果を入力" }).click();
   const dialog = page.getByRole("dialog");
-  await expect(page.getByLabel("Aliceの点数")).toHaveValue("0");
+  await expect(page.getByLabel("Aliceの点数")).toHaveValue("");
   await dialog.getByRole("button", { name: "結果を保存", exact: true }).click();
-  await expect(dialog.getByRole("alert")).toContainText("合計");
+  await expect(page.getByLabel("Aliceのチップ枚数")).toHaveValue("");
+  await expect(dialog.getByRole("alert")).toContainText("入力してください");
   for (const [name, point, chip] of [
     ["Alice", "60000", "2"],
     ["Bob", "35000", "-1"],
@@ -49,6 +50,8 @@ test("スマホで設定・点数入力・永続化・修正・CSV・削除・�
   ).toHaveText("+470");
   await page.getByRole("button", { name: "履歴", exact: true }).click();
   await page.getByRole("button", { name: "修正", exact: true }).click();
+  await expect(page.getByLabel("Aliceの点数")).toHaveValue("60000");
+  await expect(page.getByLabel("Carolのチップ枚数")).toHaveValue("0");
   await page.getByLabel("Aliceの点数").fill("50000");
   await page.getByLabel("Daveの点数").fill("0");
   await dialog.getByRole("button", { name: "結果を保存", exact: true }).click();
@@ -76,8 +79,10 @@ test("スマホで設定・点数入力・永続化・修正・CSV・削除・�
     page.getByRole("heading", { name: "Alice", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "＋ 半荘の結果を入力" }).click();
-  for (const name of ["Alice", "Bob", "Carol", "Dave"])
+  for (const name of ["Alice", "Bob", "Carol", "Dave"]) {
     await page.getByLabel(`${name}の点数`).fill("25000");
+    await page.getByLabel(`${name}のチップ枚数`).fill("0");
+  }
   await dialog.getByRole("button", { name: "結果を保存", exact: true }).click();
   await expect(dialog).not.toBeVisible();
   await page.reload();
