@@ -2,7 +2,7 @@
 const ROOT = new URL("./", self.location).href;
 // Isolate this project's cache from other Pages apps on the same origin.
 const CACHE_PREFIX = `janroku-${new URL(ROOT).pathname}-`;
-const CACHE = `${CACHE_PREFIX}v4`;
+const CACHE = `${CACHE_PREFIX}v5`;
 self.addEventListener("install", (event) => {
   event.waitUntil(
     (async () => {
