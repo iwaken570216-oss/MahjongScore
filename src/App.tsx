@@ -1,3 +1,5 @@
+import { periodRounds } from "./domain/period";
+import { lineShareUrl, standingsText } from "./domain/share";
 import { useRoom } from "./sync/useRoom";
 import RoomPanel from "./sync/RoomPanel";
 import { useEffect, useState } from "react";
@@ -27,7 +29,9 @@ export default function App() {
   const [localSettings, setSettings] = useState<Settings>(initialSettings),
     [draft, setDraft] = useState<Settings>(initialSettings);
   const [localRounds, setRounds] = useState<Round[]>([]),
-    [tab, setTab] = useState<"today" | "history" | "settings">("today");
+    [tab, setTab] = useState<"today" | "ranking" | "history" | "settings">(
+      "today",
+    );
   const [ready, setReady] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
@@ -38,6 +42,9 @@ export default function App() {
   const [date, setDate] = useState(localDate()),
     [filter, setFilter] = useState(""),
     [deleteId, setDeleteId] = useState<string | null>(null);
+  const [period, setPeriod] = useState<"month" | "year">("month");
+  const [month, setMonth] = useState(localDate().slice(0, 7));
+  const [year, setYear] = useState(localDate().slice(0, 4));
   const shared = useRoom(ready);
   const settings = shared.room?.data.settings ?? localSettings;
   const rounds = shared.room?.data.rounds ?? localRounds;
@@ -107,6 +114,10 @@ export default function App() {
   }, [Boolean(editing), Boolean(deleteId), busy]);
   const today = rounds.filter((r) => r.date === localDate());
   const summary = totals(today, settings.players);
+  const selectedPeriod = period === "month" ? month : year;
+  const rankedRounds = periodRounds(rounds, period, selectedPeriod);
+  const ranking = totals(rankedRounds, settings.players);
+  const rankingTitle = `${selectedPeriod} ${period === "month" ? "月間" : "年間"}ランキング（チップ込み）`;
   const players = editing?.players ?? settings.players,
     rules = editing?.rules ?? settings.rules;
   const validInput =
@@ -289,16 +300,20 @@ export default function App() {
             <h1>
               {tab === "today"
                 ? "今日の対局"
-                : tab === "history"
-                  ? "対局の記録"
-                  : "プレイヤー・ルール"}
+                : tab === "ranking"
+                  ? "月間・年間ランキング"
+                  : tab === "history"
+                    ? "対局の記録"
+                    : "プレイヤー・ルール"}
             </h1>
             <p className="muted">
               {tab === "today"
                 ? `${localDate().replaceAll("-", " / ")} · 一局一局を、大切に。`
-                : tab === "history"
-                  ? "積み重ねた勝負を、いつでも振り返る。"
-                  : "いつもの4人で、いつものルールを。"}
+                : tab === "ranking"
+                  ? "累計スコア・トップ率・平均順位を振り返る。"
+                  : tab === "history"
+                    ? "積み重ねた勝負を、いつでも振り返る。"
+                    : "いつもの4人で、いつものルールを。"}
             </p>
           </div>
           <span className="decoration" aria-hidden="true">
@@ -393,6 +408,19 @@ export default function App() {
                     </article>
                   ))}
                 </div>
+                <a
+                  className="secondary full share-link"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  href={lineShareUrl(
+                    standingsText(
+                      `${localDate()} 本日の成績（チップ込み）`,
+                      summary,
+                    ),
+                  )}
+                >
+                  本日の成績をLINEで共有
+                </a>
                 {today.length === 0 && (
                   <p className="hint">
                     まだ対局の記録がありません。最初の半荘を記録しましょう。
@@ -432,6 +460,89 @@ export default function App() {
                   </button>
                 </div>
               </>
+            )}
+            {tab === "ranking" && (
+              <section aria-label="期間ランキング">
+                <div className="history-actions">
+                  <button
+                    className={period === "month" ? "primary" : "secondary"}
+                    aria-pressed={period === "month"}
+                    onClick={() => setPeriod("month")}
+                  >
+                    月間
+                  </button>
+                  <button
+                    className={period === "year" ? "primary" : "secondary"}
+                    aria-pressed={period === "year"}
+                    onClick={() => setPeriod("year")}
+                  >
+                    年間
+                  </button>
+                </div>
+                <label>
+                  {period === "month" ? "集計する月" : "集計する年"}
+                  {period === "month" ? (
+                    <input
+                      type="month"
+                      value={month}
+                      onChange={(e) => setMonth(e.target.value)}
+                    />
+                  ) : (
+                    <input
+                      type="number"
+                      min="1"
+                      max="9999"
+                      value={year}
+                      onChange={(e) => setYear(e.target.value)}
+                    />
+                  )}
+                </label>
+                <h2>{rankingTitle}</h2>
+                <p className="hint">
+                  {rankedRounds.length}半荘 ·
+                  順位はチップ込みの累計スコアで判定。トップ率と平均順位は各半荘の素点順位で集計します。同点順位は保存したルールに従います。
+                </p>
+                <div className="score-list">
+                  {ranking.map((row) => (
+                    <article
+                      className={`score-card ${row.rank === 1 ? "first" : ""}`}
+                      key={row.id}
+                    >
+                      <span className="rank">
+                        {row.rank || "—"}
+                        <small>位</small>
+                      </span>
+                      <div className="player">
+                        <h3>{row.name}</h3>
+                        <p>
+                          トップ率 {row.topRate.toFixed(1)}% · {row.games}回
+                        </p>
+                        <p>平均順位 {row.averageRank?.toFixed(2) ?? "—"}</p>
+                      </div>
+                      <div className="score">
+                        <strong
+                          className={row.totalScore < 0 ? "negative" : ""}
+                        >
+                          {signed(row.totalScore)}
+                        </strong>
+                        <small>麻雀 {signed(row.score)} pt</small>
+                        <small>チップ {signed(row.chipPoints)} pt</small>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+                {rankedRounds.length === 0 && (
+                  <p className="hint">この期間の対局記録はありません。</p>
+                )}
+                <a
+                  className="secondary full share-link"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  href={lineShareUrl(standingsText(rankingTitle, ranking))}
+                >
+                  ランキングをLINEで共有
+                </a>
+              </section>
             )}
             {tab === "history" && (
               <>
@@ -721,6 +832,7 @@ export default function App() {
         {(
           [
             ["today", "◈", "今日"],
+            ["ranking", "♕", "成績"],
             ["history", "▤", "履歴"],
             ["settings", "⚙", "設定"],
           ] as const

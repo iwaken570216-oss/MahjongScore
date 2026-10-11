@@ -663,3 +663,10 @@ select {
   font-size: 12px;
   margin-bottom: 10px;
 }
+
+.share-link {
+  display: block;
+  text-align: center;
+  text-decoration: none;
+  margin: 12px 0;
+}

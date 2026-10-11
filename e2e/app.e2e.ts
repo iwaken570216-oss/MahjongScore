@@ -239,3 +239,44 @@ test("6人登録・5人交代・休みの成績・チップポイント込みの
     fullPage: true,
   });
 });
+
+test("月間・年間ランキングとLINE共有の送信内容", async ({ page }) => {
+  await page.goto("./");
+  await page.getByRole("button", { name: "＋ 半荘の結果を入力" }).click();
+  for (const [name, value] of [
+    ["東家", "40000"],
+    ["南家", "30000"],
+    ["西家", "20000"],
+    ["北家", "10000"],
+  ]) {
+    await page.getByLabel(`${name}の点数`).fill(value);
+    await page.getByLabel(`${name}のチップ枚数`).fill("0");
+  }
+  await page
+    .getByRole("dialog")
+    .locator('input[type="date"]')
+    .fill("2026-01-31");
+  await page.getByRole("button", { name: "結果を保存", exact: true }).click();
+  await expect(page.getByRole("dialog")).not.toBeVisible();
+  await page.getByRole("button", { name: "成績", exact: true }).click();
+  await page.getByLabel("集計する月").fill("2026-01");
+  const ranking = page.getByRole("region", { name: "期間ランキング" });
+  await expect(ranking).toContainText("1半荘");
+  await expect(ranking.locator(".score-card").first()).toContainText(
+    "平均順位 1.00",
+  );
+  const href = await page
+    .getByRole("link", { name: "ランキングをLINEで共有" })
+    .getAttribute("href");
+  expect(decodeURIComponent(href!.split("?")[1])).toContain("東家：+50 pt");
+  await page.getByLabel("集計する月").fill("2026-02");
+  await expect(ranking).toContainText("この期間の対局記録はありません");
+  await page.getByRole("button", { name: "年間", exact: true }).click();
+  await page.getByLabel("集計する年").fill("2026");
+  await expect(ranking).toContainText("1半荘");
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= window.innerWidth,
+    ),
+  ).toBe(true);
+});
