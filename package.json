@@ -9,11 +9,9 @@
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "format": "prettier --write src e2e public/sw.js *.ts *.json index.html README.md",
-    "test:sync:e2e": "playwright test --config playwright.sync.config.ts"
+    "format": "prettier --write src e2e public/sw.js *.ts *.json index.html README.md"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.117.3",
     "idb": "^8.0.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",

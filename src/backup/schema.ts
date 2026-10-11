@@ -51,21 +51,8 @@ export function parseSnapshot(value: unknown): Snapshot {
   const result = schema.safeParse(value);
   if (!result.success)
     throw new Error(
-      "共有データの形式が正しくありません。代表者に確認してください。",
+      "バックアップデータの形式が正しくありません。代表者に確認してください。",
     );
   result.data.rounds.forEach((r) => calculate(r.points, r.chips, r.rules));
   return result.data;
-}
-export type Selection = { id: string; token?: string };
-const selectionSchema = z.object({ id: z.uuid(), token: z.uuid().optional() });
-export function parseSelection(value: unknown): Selection | null {
-  const result = selectionSchema.safeParse(value);
-  return result.success ? result.data : null;
-}
-export function inviteSelection(hash: string): Selection | null {
-  const params = new URLSearchParams(hash.replace(/^#/, ""));
-  return parseSelection({
-    id: params.get("room"),
-    token: params.get("invite") ?? undefined,
-  });
 }

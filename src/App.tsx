@@ -1,7 +1,7 @@
 import { periodRounds } from "./domain/period";
 import { lineShareUrl, standingsText } from "./domain/share";
-import { useRoom } from "./sync/useRoom";
-import RoomPanel from "./sync/RoomPanel";
+import BackupPanel from "./BackupPanel";
+
 import { useEffect, useState } from "react";
 import {
   calculate,
@@ -45,18 +45,8 @@ export default function App() {
   const [period, setPeriod] = useState<"month" | "year">("month");
   const [month, setMonth] = useState(localDate().slice(0, 7));
   const [year, setYear] = useState(localDate().slice(0, 4));
-  const shared = useRoom(ready);
-  const settings = shared.room?.data.settings ?? localSettings;
-  const rounds = shared.room?.data.rounds ?? localRounds;
-  const [editRevision, setEditRevision] = useState(0),
-    [draftRevision, setDraftRevision] = useState(0),
-    [deleteRevision, setDeleteRevision] = useState(0);
-  useEffect(() => {
-    setDraft(settings);
-    setDraftRevision(shared.room?.revision ?? 0);
-    setEditing(null);
-    setDeleteId(null);
-  }, [shared.room?.id, shared.selected]);
+  const settings = localSettings;
+  const rounds = localRounds;
   useEffect(() => {
     load()
       .then((data) => {
@@ -141,7 +131,7 @@ export default function App() {
       setNotice(message);
     } catch (caught) {
       setError(
-        shared.selected && caught instanceof Error
+        caught instanceof Error
           ? caught.message
           : "保存に失敗しました。保存容量やブラウザの設定を確認して、もう一度お試しください。",
       );
@@ -150,8 +140,6 @@ export default function App() {
     }
   }
   function open(round?: Round) {
-    if (shared.readOnly) return;
-    setEditRevision(shared.room?.revision ?? 0);
     setEditing(
       round ?? {
         id: "",
@@ -178,7 +166,6 @@ export default function App() {
     }
   }
   async function submit() {
-    if (shared.readOnly) return;
     if (!editing || !validInput || !date) {
       setError(
         "日付と4人分の終了点数を入力してください。チップ枚数は整数で入力し、空欄は0枚として扱います。",
@@ -211,24 +198,12 @@ export default function App() {
       createdAt: editing.createdAt || Date.now(),
     };
     await perform(async () => {
-      if (shared.selected) {
-        await shared.commit(
-          {
-            version: 1,
-            settings,
-            rounds: [...rounds.filter((x) => x.id !== r.id), r],
-          },
-          editRevision,
-        );
-      } else {
-        await saveRound(r);
-        setRounds((current) => [...current.filter((x) => x.id !== r.id), r]);
-      }
+      await saveRound(r);
+      setRounds((current) => [...current.filter((x) => x.id !== r.id), r]);
       setEditing(null);
     }, "対局結果を保存しました。");
   }
   async function storeSettings() {
-    if (shared.readOnly) return;
     const message = validateRules(draft.rules);
     if (message) {
       setError(message);
@@ -248,16 +223,8 @@ export default function App() {
       players: draft.players.map((p, i) => ({ ...p, name: names[i] })),
     };
     await perform(async () => {
-      if (shared.selected) {
-        await shared.commit(
-          { version: 1, settings: updated, rounds },
-          draftRevision,
-        );
-        setDraftRevision(draftRevision + 1);
-      } else {
-        await saveSettings(updated);
-        setSettings(updated);
-      }
+      await saveSettings(updated);
+      setSettings(updated);
       setDraft(updated);
     }, "プレイヤーとルールを保存しました。");
   }
@@ -290,7 +257,7 @@ export default function App() {
         </a>
         <span className="local-tag">
           <i />
-          {shared.selected ? "共有ルーム" : "端末に保存"}
+          {"端末に保存"}
         </span>
       </header>
       <main>
@@ -333,18 +300,9 @@ export default function App() {
             </button>
           </div>
         )}
-        <RoomPanel
-          shared={shared}
-          snapshot={{ version: 1, settings, rounds }}
-          disabled={busy || !ready}
-        />
-        {!ready || (shared.selected && !shared.room) ? (
+        {!ready ? (
           <div className="empty">
-            {shared.selected
-              ? "共有ルームに接続しています。接続できない場合は上の案内をご確認ください。"
-              : error
-                ? "保存領域を利用できません。"
-                : "記録を読み込んでいます…"}
+            {error ? "保存領域を利用できません。" : "記録を読み込んでいます…"}
           </div>
         ) : (
           <>
@@ -428,7 +386,7 @@ export default function App() {
                 )}
                 <button
                   className="primary full add-round"
-                  disabled={shared.readOnly || busy}
+                  disabled={busy}
                   onClick={() => open()}
                 >
                   ＋ 半荘の結果を入力
@@ -451,7 +409,6 @@ export default function App() {
                   <button
                     onClick={() => {
                       setDraft(settings);
-                      setDraftRevision(shared.room?.revision ?? 0);
                       setTab("settings");
                       setError("");
                     }}
@@ -606,7 +563,7 @@ export default function App() {
                       ))}
                       <div className="history-actions">
                         <button
-                          disabled={shared.readOnly || busy}
+                          disabled={busy}
                           className="secondary"
                           onClick={() => open(r)}
                         >
@@ -614,9 +571,8 @@ export default function App() {
                         </button>
                         <button
                           className="danger"
-                          disabled={shared.readOnly || busy}
+                          disabled={busy}
                           onClick={() => {
-                            setDeleteRevision(shared.room?.revision ?? 0);
                             setDeleteId(r.id);
                           }}
                         >
@@ -635,10 +591,7 @@ export default function App() {
               </>
             )}
             {tab === "settings" && (
-              <fieldset
-                className="settings-fields"
-                disabled={shared.readOnly || busy}
-              >
+              <fieldset className="settings-fields" disabled={busy}>
                 <section className="panel">
                   <h2>プレイヤー登録</h2>
                   <p className="hint">
@@ -827,6 +780,17 @@ export default function App() {
             )}
           </>
         )}
+        {ready && tab === "settings" && (
+          <BackupPanel
+            snapshot={{ version: 1, settings, rounds }}
+            disabled={busy}
+            onImported={(data) => {
+              setSettings(data.settings);
+              setDraft(data.settings);
+              setRounds(data.rounds);
+            }}
+          />
+        )}
       </main>
       <nav aria-label="メインメニュー">
         {(
@@ -847,7 +811,6 @@ export default function App() {
               setNotice("");
               if (key === "settings") {
                 setDraft(settings);
-                setDraftRevision(shared.room?.revision ?? 0);
               }
             }}
           >
@@ -1035,21 +998,10 @@ export default function App() {
               disabled={busy}
               onClick={() =>
                 perform(async () => {
-                  if (shared.selected) {
-                    await shared.commit(
-                      {
-                        version: 1,
-                        settings,
-                        rounds: rounds.filter((r) => r.id !== deleteId),
-                      },
-                      deleteRevision,
-                    );
-                  } else {
-                    await removeRound(deleteId);
-                    setRounds((current) =>
-                      current.filter((r) => r.id !== deleteId),
-                    );
-                  }
+                  await removeRound(deleteId);
+                  setRounds((current) =>
+                    current.filter((r) => r.id !== deleteId),
+                  );
                   setDeleteId(null);
                 }, "対局を削除しました。")
               }
