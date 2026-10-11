@@ -122,7 +122,7 @@ export default function App() {
     rules = editing?.rules ?? settings.rules;
   const validInput =
     points.every((v) => v.trim() !== "" && Number.isInteger(Number(v))) &&
-    chips.every((v) => v.trim() !== "" && Number.isInteger(Number(v)));
+    chips.every((v) => Number.isInteger(Number(v)));
   let preview: ReturnType<typeof calculate> | null = null;
   try {
     if (validInput)
@@ -181,7 +181,7 @@ export default function App() {
     if (shared.readOnly) return;
     if (!editing || !validInput || !date) {
       setError(
-        "日付と4人分の終了点数・チップ枚数を入力してください。変動なしは0を入力してください。",
+        "日付と4人分の終了点数を入力してください。チップ枚数は整数で入力し、空欄は0枚として扱います。",
       );
       return;
     }
@@ -890,7 +890,7 @@ export default function App() {
               />
             </label>
             <p className="hint">
-              点数は素点、チップは増減を入力。箱下は「−」で入力できます。
+              点数は素点、チップは増減を入力（空欄は0枚）。箱下は「−」で入力できます。
             </p>
             {!editing.id && (
               <section className="participant-picker">
