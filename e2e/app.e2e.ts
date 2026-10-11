@@ -81,12 +81,20 @@ test("スマホで設定・点数入力・永続化・修正・CSV・削除・�
   await page.getByRole("button", { name: "＋ 半荘の結果を入力" }).click();
   for (const name of ["Alice", "Bob", "Carol", "Dave"]) {
     await page.getByLabel(`${name}の点数`).fill("25000");
-    await page.getByLabel(`${name}のチップ枚数`).fill("0");
+    await expect(page.getByLabel(`${name}のチップ枚数`)).toHaveValue("");
   }
   await dialog.getByRole("button", { name: "結果を保存", exact: true }).click();
   await expect(dialog).not.toBeVisible();
   await page.reload();
   await expect(page.locator(".stat-strip")).toContainText("1");
+  await page.getByRole("button", { name: "履歴", exact: true }).click();
+  await page.getByRole("button", { name: "修正", exact: true }).click();
+  await expect(page.getByLabel("Aliceのチップ枚数")).toHaveValue("0");
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "キャンセル", exact: true })
+    .click();
+  await page.getByRole("button", { name: "今日", exact: true }).click();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,
