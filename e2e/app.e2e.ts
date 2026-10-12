@@ -288,3 +288,54 @@ test("月間・年間ランキングとLINE共有の送信内容", async ({ page
     ),
   ).toBe(true);
 });
+
+test("サーバーへ接続せずJSONバックアップを復元できる", async ({ page }) => {
+  const remote: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("supabase.co")) remote.push(request.url());
+  });
+  await page.goto("./#room=old&invite=old");
+  await expect(
+    page.getByRole("button", { name: "共有ルームを作成" }),
+  ).toHaveCount(0);
+  await page.getByRole("button", { name: "設定", exact: true }).click();
+  const players = ["一", "二", "三", "四"].map((name, i) => ({
+    id: `backup-${i}`,
+    name,
+  }));
+  const rules = {
+    startingPoints: 25000,
+    returnPoints: 30000,
+    uma: [20, 10, -10, -20],
+    tie: "split",
+    chipPoints: 1,
+  };
+  const snapshot = {
+    version: 1,
+    settings: { players, rules },
+    rounds: [
+      {
+        id: "backup-round",
+        date: "2026-01-01",
+        players,
+        rules,
+        points: [40000, 30000, 20000, 10000],
+        chips: [0, 0, 0, 0],
+        createdAt: 1,
+      },
+    ],
+  };
+  page.on("dialog", (dialog) => void dialog.accept());
+  await page
+    .getByLabel("JSONバックアップを読み込む")
+    .setInputFiles({
+      name: "backup.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(JSON.stringify(snapshot)),
+    });
+  await expect(page.getByRole("status")).toContainText("記録を取り込みました");
+  await page.reload();
+  await page.getByRole("button", { name: "履歴", exact: true }).click();
+  await expect(page.locator(".history-card")).toContainText("40,000点");
+  expect(remote).toEqual([]);
+});

@@ -49,3 +49,16 @@ export const initialSettings: Settings = {
   })),
   rules: defaultRules,
 };
+
+/** Merge a validated backup atomically, retaining unrelated local rounds. */
+export async function importBackup(data: {
+  settings: Settings;
+  rounds: Round[];
+}) {
+  const db = await database();
+  const tx = db.transaction(["settings", "rounds"], "readwrite");
+  await tx.objectStore("settings").put(data.settings, "current");
+  for (const round of data.rounds) await tx.objectStore("rounds").put(round);
+  await tx.done;
+  return load();
+}
